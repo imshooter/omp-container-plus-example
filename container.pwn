@@ -99,6 +99,14 @@ stock bool:GetContainerSlotData(containerid, slot, &itemid, &amount) {
     return true;
 }
 
+stock GetContainerSize(containerid) {
+    if (!IsValidContainer(containerid)) {
+        return 0;
+    }
+
+    return list_size(gContainerListID[containerid]);
+}
+
 stock bool:SetContainerMaxSize(containerid, size) {
     if (!IsValidContainer(containerid)) {
         return false;
@@ -119,14 +127,6 @@ stock GetContainerMaxSize(containerid) {
     }
 
     return gContainerSize[containerid];
-}
-
-stock GetContainerSize(containerid) {
-    if (!IsValidContainer(containerid)) {
-        return 0;
-    }
-
-    return list_size(gContainerListID[containerid]);
 }
 
 stock bool:SetContainerName(containerid, const name[], size = sizeof (name)) {
