@@ -11,6 +11,21 @@ static
 ;
 
 /**
+ * # Functions
+ */
+
+forward bool:AddItemToInventory(playerid, itemid, amount);
+forward bool:RemoveItemFromInventory(playerid, slot, bool:call = true);
+forward bool:GetInventorySlotData(playerid, slot, &itemid, &amount);
+
+/**
+ * # Calls
+ */
+
+forward OnItemAddToInventory(playerid, slot, itemid, amount);
+forward OnItemRemoveFromInventory(playerid, slot, itemid, amount);
+
+/**
  * # External
  */
 
@@ -19,15 +34,36 @@ stock bool:AddItemToInventory(playerid, itemid, amount) {
         return false;
     }
 
-    return AddItemToContainer(gContainerID[playerid], itemid, amount);
-}
+    new const
+        slot = AddItemToContainer(gContainerID[playerid], itemid, amount)
+    ;
 
-stock bool:RemoveItemFromInventory(playerid, itemid, amount) {
-    if (!IsPlayerConnected(playerid)) {
+    if (slot == -1) {
         return false;
     }
 
-    return RemoveItemFromContainer(gContainerID[playerid], itemid, amount);
+    CallLocalFunction("OnItemAddToInventory", "iiii", playerid, slot, itemid, amount);
+
+    return true;
+}
+
+stock bool:RemoveItemFromInventory(playerid, slot, bool:call = true) {
+    new
+        itemid,
+        amount
+    ;
+
+    if (!GetInventorySlotData(playerid, slot, itemid, amount)) {
+        return false;
+    }
+
+    RemoveItemFromContainer(gContainerID[playerid], slot);
+
+    if (call) {
+        CallLocalFunction("OnItemRemoveFromInventory", "iiii", playerid, slot, itemid, slot);
+    }
+
+    return true;
 }
 
 stock bool:GetInventorySlotData(playerid, slot, &itemid, &amount) {
