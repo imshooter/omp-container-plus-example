@@ -14,7 +14,7 @@ static
  * # Functions
  */
 
-forward bool:AddItemToInventory(playerid, itemid, amount);
+forward bool:AddItemToInventory(playerid, itemid, amount, bool:call = true);
 forward bool:RemoveItemFromInventory(playerid, slot, bool:call = true);
 forward bool:GetInventorySlotData(playerid, slot, &itemid, &amount);
 
@@ -29,7 +29,7 @@ forward OnItemRemoveFromInventory(playerid, slot, itemid, amount);
  * # External
  */
 
-stock bool:AddItemToInventory(playerid, itemid, amount) {
+stock bool:AddItemToInventory(playerid, itemid, amount, bool:call = true) {
     if (!IsPlayerConnected(playerid)) {
         return false;
     }
@@ -42,7 +42,9 @@ stock bool:AddItemToInventory(playerid, itemid, amount) {
         return false;
     }
 
-    CallLocalFunction("OnItemAddToInventory", "iiii", playerid, slot, itemid, amount);
+    if (call) {
+        CallLocalFunction("OnItemAddToInventory", "iiii", playerid, slot, itemid, amount);
+    }
 
     return true;
 }
