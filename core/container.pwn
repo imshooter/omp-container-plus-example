@@ -78,13 +78,13 @@ stock bool:DestroyContainer(containerid) {
     return true;
 }
 
-stock bool:AddItemToContainer(containerid, itemid, amount) {
+stock AddItemToContainer(containerid, itemid, amount) {
     if (!IsValidContainer(containerid)) {
-        return false;
+        return -1;
     }
 
     if (list_size(gContainerList[containerid]) >= gContainerSize[containerid]) {
-        return false;
+        return -1;
     }
 
     new
@@ -94,9 +94,7 @@ stock bool:AddItemToContainer(containerid, itemid, amount) {
     data[E_CONTAINER_ITEM_ID] = itemid;
     data[E_CONTAINER_ITEM_AMOUNT] = amount;
 
-    list_add_arr(gContainerList[containerid], data);
-
-    return true;
+    return list_add_arr(gContainerList[containerid], data);
 }
 
 stock bool:RemoveItemFromContainer(containerid, slot) {
@@ -109,7 +107,7 @@ stock bool:RemoveItemFromContainer(containerid, slot) {
     return true;
 }
 
-stock bool:GetContainerSlotData(containerid, slot, &itemid, &amount) {
+stock bool:GetContainerSlotData(containerid, slot, &itemid, &amount = 0) {
     if (!IsValidContainer(containerid)) {
         return false;
     }
