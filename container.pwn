@@ -1,12 +1,13 @@
-#include <open.mp>
-#include <PawnPlus>
+/**
+ * # Header
+ */
 
 #if !defined MAX_CONTAINER
     #define MAX_CONTAINER (2048)
 #endif
 
 #if !defined MAX_CONTAINER_SLOTS
-    #define MAX_CONTAINER_SLOTS (64)
+    #define MAX_CONTAINER_SLOTS (128)
 #endif
 
 #if !defined MAX_CONTAINER_NAME
@@ -21,17 +22,19 @@ static enum _:E_CONTAINER_DATA {
 static
     gContainerName[MAX_CONTAINER][MAX_CONTAINER_NAME char],
     gContainerSize[MAX_CONTAINER],
-    List:gContainerListID[MAX_CONTAINER]
+    List:gContainerList[MAX_CONTAINER]
 ;
 
-main(){}
+/**
+ * # External
+ */
 
 stock bool:IsValidContainer(containerid) {
     if (!(0 <= containerid < MAX_CONTAINER)) {
         return false;
     }
     
-    return list_valid(gContainerListID[containerid]);
+    return list_valid(gContainerList[containerid]);
 }
 
 stock CreateContainer(const name[], size) {
@@ -56,9 +59,23 @@ stock CreateContainer(const name[], size) {
 
     strpack(gContainerName[containerid], name);
     gContainerSize[containerid] = size;
-    gContainerListID[containerid] = list_new();
+    gContainerList[containerid] = list_new();
 
     return containerid;
+}
+
+stock bool:DestroyContainer(containerid) {
+    if (!IsValidContainer(containerid)) {
+        return false;
+    }
+
+    list_delete(gContainerList[containerid]);
+
+    gContainerName[containerid][0] = EOS;
+    gContainerSize[containerid] = 0;
+    gContainerList[containerid] = INVALID_LIST;
+
+    return true;
 }
 
 stock bool:AddItemToContainer(containerid, itemid, amount) {
@@ -66,7 +83,7 @@ stock bool:AddItemToContainer(containerid, itemid, amount) {
         return false;
     }
 
-    if (list_size(gContainerListID[containerid]) >= gContainerSize[containerid]) {
+    if (list_size(gContainerList[containerid]) >= gContainerSize[containerid]) {
         return false;
     }
 
@@ -77,7 +94,17 @@ stock bool:AddItemToContainer(containerid, itemid, amount) {
     data[E_CONTAINER_ITEM_ID] = itemid;
     data[E_CONTAINER_ITEM_AMOUNT] = amount;
 
-    list_add_arr(gContainerListID[containerid], data);
+    list_add_arr(gContainerList[containerid], data);
+
+    return true;
+}
+
+stock bool:RemoveItemFromContainer(containerid, slot) {
+    if (!IsValidContainer(containerid)) {
+        return false;
+    }
+
+    list_remove(gContainerList[containerid], slot);
 
     return true;
 }
@@ -91,20 +118,12 @@ stock bool:GetContainerSlotData(containerid, slot, &itemid, &amount) {
         data[E_CONTAINER_DATA]
     ;
 
-    list_get_arr(gContainerListID[containerid], slot, data);
+    list_get_arr(gContainerList[containerid], slot, data);
 
     itemid = data[E_CONTAINER_ITEM_ID];
     amount = data[E_CONTAINER_ITEM_AMOUNT];
 
     return true;
-}
-
-stock GetContainerSize(containerid) {
-    if (!IsValidContainer(containerid)) {
-        return 0;
-    }
-
-    return list_size(gContainerListID[containerid]);
 }
 
 stock bool:SetContainerMaxSize(containerid, size) {
@@ -129,6 +148,14 @@ stock GetContainerMaxSize(containerid) {
     return gContainerSize[containerid];
 }
 
+stock GetContainerSize(containerid) {
+    if (!IsValidContainer(containerid)) {
+        return 0;
+    }
+
+    return list_size(gContainerList[containerid]);
+}
+
 stock bool:SetContainerName(containerid, const name[], size = sizeof (name)) {
     if (!IsValidContainer(containerid)) {
         return false;
@@ -148,76 +175,3 @@ stock bool:GetContainerName(containerid, name[], size = sizeof (name)) {
 
     return true;
 }
-
-/**
- * # Tests
- */
-
-public OnGameModeInit() {
-    new const
-        containerid1 = CreateContainer("Container 1", 8),
-        containerid2 = CreateContainer("Container 2", 8)
-    ;
-
-    // Add
-
-    AddItemToContainer(containerid1, 90, 100);
-    AddItemToContainer(containerid1, 91, 110);
-    AddItemToContainer(containerid1, 92, 120);
-    AddItemToContainer(containerid1, 93, 130);
-    AddItemToContainer(containerid1, 94, 140);
-
-    AddItemToContainer(containerid2, 95, 150);
-    AddItemToContainer(containerid2, 96, 160);
-    AddItemToContainer(containerid2, 97, 170);
-    AddItemToContainer(containerid2, 98, 180);
-    AddItemToContainer(containerid2, 99, 190);
-
-    // Check
-
-    new
-        name[MAX_CONTAINER_NAME],
-        itemid,
-        amount
-    ;
-
-    GetContainerName(containerid1, name);
-    printf("1. name: %s ~ Max size: %i", name, GetContainerMaxSize(containerid1));
-
-    SetContainerName(containerid1, "Cnt 1");
-    SetContainerMaxSize(containerid1, 16);
-    GetContainerName(containerid1, name);
-    printf("2. name: %s ~ Max size: %i", name, GetContainerMaxSize(containerid1));
-    
-    for (new i, size = GetContainerSize(containerid1); i < size; i++) {
-        GetContainerSlotData(containerid1, i, itemid, amount);
-
-        printf("Slot: %i ~ Item: %i ~ Amount: %i", i, itemid, amount);
-    }
-
-    print("-");
-
-    for (new i, size = GetContainerSize(containerid2); i < size; i++) {
-        GetContainerSlotData(containerid2, i, itemid, amount);
-
-        printf("Slot: %i ~ Item: %i ~ Amount: %i", i, itemid, amount);
-    }
-    
-    return 1;
-}
-
-/**
- *  [Info] 1. name: Container 1 ~ Max size: 8
- *  [Info] 2. name: Cnt 1 ~ Max size: 16
- *  [Info] Slot: 0 ~ Item: 90 ~ Amount: 100
- *  [Info] Slot: 1 ~ Item: 91 ~ Amount: 110
- *  [Info] Slot: 2 ~ Item: 92 ~ Amount: 120
- *  [Info] Slot: 3 ~ Item: 93 ~ Amount: 130
- *  [Info] Slot: 4 ~ Item: 94 ~ Amount: 140
- *  [Info] -
- *  [Info] Slot: 0 ~ Item: 95 ~ Amount: 150
- *  [Info] Slot: 1 ~ Item: 96 ~ Amount: 160
- *  [Info] Slot: 2 ~ Item: 97 ~ Amount: 170
- *  [Info] Slot: 3 ~ Item: 98 ~ Amount: 180
- *  [Info] Slot: 4 ~ Item: 99 ~ Amount: 190
- */
