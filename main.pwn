@@ -43,6 +43,7 @@ public OnGameModeInit() {
 
     SetContainerName(containerid1, "Cnt 1");
     SetContainerMaxSize(containerid1, 16);
+
     GetContainerName(containerid1, name);
     printf("2. name: %s ~ Max size: %i", name, GetContainerMaxSize(containerid1));
 
