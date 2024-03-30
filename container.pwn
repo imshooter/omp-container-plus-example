@@ -107,16 +107,23 @@ stock GetContainerSize(containerid) {
 
 public OnGameModeInit() {
     new const
-        containerid = CreateContainer(8)
+        containerid1 = CreateContainer(8),
+        containerid2 = CreateContainer(8)
     ;
 
     // Add
 
-    AddItemToContainer(containerid, 90, 100);
-    AddItemToContainer(containerid, 91, 110);
-    AddItemToContainer(containerid, 92, 120);
-    AddItemToContainer(containerid, 93, 130);
-    AddItemToContainer(containerid, 94, 140);
+    AddItemToContainer(containerid1, 90, 100);
+    AddItemToContainer(containerid1, 91, 110);
+    AddItemToContainer(containerid1, 92, 120);
+    AddItemToContainer(containerid1, 93, 130);
+    AddItemToContainer(containerid1, 94, 140);
+
+    AddItemToContainer(containerid2, 95, 150);
+    AddItemToContainer(containerid2, 96, 160);
+    AddItemToContainer(containerid2, 97, 170);
+    AddItemToContainer(containerid2, 98, 180);
+    AddItemToContainer(containerid2, 99, 190);
 
     // Check
 
@@ -125,8 +132,16 @@ public OnGameModeInit() {
         amount
     ;
 
-    for (new i, size = GetContainerSize(containerid); i < size; i++) {
-        GetContainerSlotData(containerid, i, itemid, amount);
+    for (new i, size = GetContainerSize(containerid1); i < size; i++) {
+        GetContainerSlotData(containerid1, i, itemid, amount);
+
+        printf("Slot: %i ~ Item: %i ~ Amount: %i", i, itemid, amount);
+    }
+
+    print("-");
+
+    for (new i, size = GetContainerSize(containerid2); i < size; i++) {
+        GetContainerSlotData(containerid2, i, itemid, amount);
 
         printf("Slot: %i ~ Item: %i ~ Amount: %i", i, itemid, amount);
     }
