@@ -49,7 +49,7 @@ new
  */
 
 forward ItemBuild:BuildItem(const name[], modelid);
-forward bool:IsValidItemBuild(Item:itemid);
+forward bool:IsValidItemBuild(ItemBuild:build);
 forward bool:GetItemBuildName(ItemBuild:build, name[], size = sizeof (name));
 forward GetItemBuildModel(ItemBuild:build);
 
@@ -59,6 +59,13 @@ forward bool:GetItemBuild(Item:itemid, &ItemBuild:build);
 
 /**
  * # External
+ */
+
+forward OnItemCreate(Item:itemid);
+forward OnItemDestroy(Item:itemid);
+
+/**
+ * # Item Build
  */
 
 stock ItemBuild:BuildItem(const name[], modelid) {
@@ -76,7 +83,7 @@ stock ItemBuild:BuildItem(const name[], modelid) {
     return id;
 }
 
-stock bool:IsValidItemBuild(Item:itemid) {
+stock bool:IsValidItemBuild(ItemBuild:build) {
     return (0 <= _:build < ITEM_BUILD_ITER_SIZE) && Iter_Contains(ItemBuild, build);
 }
 
@@ -98,6 +105,10 @@ stock GetItemBuildModel(ItemBuild:build) {
     return gItemBuildData[build][E_ITEM_BUILD_MODEL];
 }
 
+/**
+ * # Item
+ */
+
 stock Item:CreateItem(ItemBuild:build) {
     new const
         Item:id = Item:Iter_Alloc(Item)
@@ -109,11 +120,25 @@ stock Item:CreateItem(ItemBuild:build) {
 
     gItemData[id][E_ITEM_BUILD_ID] = build;
 
+    CallLocalFunction("OnItemCreate", "i", _:itemid);
+
     return id;
 }
 
 stock bool:IsValidItem(Item:itemid) {
     return (0 <= _:itemid < ITEM_ITER_SIZE) && Iter_Contains(Item, itemid);
+}
+
+stock bool:DestroyItem(Item:itemid) {
+    if (!IsValidItem(itemid)) {
+        return false;
+    }
+
+    Iter_Remove(Item, itemid);
+
+    CallLocalFunction("OnItemDestroy", "i", _:itemid);
+
+    return true;
 }
 
 stock bool:GetItemBuild(Item:itemid, &ItemBuild:build) {
