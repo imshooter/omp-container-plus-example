@@ -7,5 +7,6 @@
 
 #include ".\core\item.pwn"
 #include ".\core\container.pwn"
+#include ".\core\inventory.pwn"
 
 main(){}
