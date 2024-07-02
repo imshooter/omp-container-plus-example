@@ -49,7 +49,7 @@ new
 
 forward Container:CreateContainer(const name[], size, bool:ordered = true);
 forward bool:IsValidContainer(Container:containerid);
-forward bool:DestroyContainer(Container:containerid);
+forward bool:DestroyContainer(Container:containerid, bool:clear = true);
 forward bool:SetContainerName(Container:containerid, const name[]);
 forward bool:GetContainerName(Container:containerid, name[], size = sizeof (name));
 forward bool:SetContainerSize(Container:containerid, size);
@@ -61,11 +61,15 @@ forward bool:IsContainerFull(Container:containerid);
 forward bool:IsContainerEmpty(Container:containerid);
 forward bool:IsContainerSlotUsed(Container:containerid, index);
 forward bool:GetContainerSlotItem(Container:containerid, index, &Item:itemid);
+forward bool:GetContainerItems(Container:containerid, Item:items[MAX_CONTAINER_SLOTS] = { INVALID_ITEM_ID, ... }, &count = 0);
 forward bool:GetItemContainerData(Item:itemid, &Container:containerid = INVALID_CONTAINER_ID, &index = -1);
 
 /**
  * # Events
  */
+
+forward OnContainerCreate(Container:containerid);
+forward OnContainerDestroy(Container:containerid);
 
 forward OnItemAddToContainer(Container:containerid, Item:itemid, index, playerid);
 forward OnItemRemoveFromContainer(Container:containerid, Item:itemid, index, playerid);
@@ -90,6 +94,8 @@ stock Container:CreateContainer(const name[], size, bool:ordered = true) {
     strcopy(gContainerData[id][E_CONTAINER_NAME], name);
     gContainerData[id][E_CONTAINER_POOL] = pool_new(size, ordered);
 
+    CallLocalFunction("OnContainerCreate", "i", _:id);
+
     return id;
 }
 
@@ -97,14 +103,35 @@ stock bool:IsValidContainer(Container:containerid) {
     return (0 <= _:containerid < CONTAINER_ITER_SIZE) && Iter_Contains(Container, containerid);
 }
 
-stock bool:DestroyContainer(Container:containerid) {
+stock bool:DestroyContainer(Container:containerid, bool:clear = true) {
     if (!IsValidContainer(containerid)) {
         return false;
+    }
+
+    if (clear) {
+        new
+            Item:dest[MAX_CONTAINER_SLOTS],
+            count,
+            Item:itemid
+        ;
+
+        GetContainerItems(containerid, dest, count);
+
+        for (new i; i < count; ++i) {
+            itemid = dest[i];
+
+            gItemContainerID[itemid] = INVALID_CONTAINER_ID;
+            gItemContainerSlotID[itemid] = -1;
+
+            DestroyItem(itemid);
+        }
     }
 
     pool_delete(gContainerData[containerid][E_CONTAINER_POOL]);
 
     Iter_Remove(Container, containerid);
+
+    CallLocalFunction("OnContainerDestroy", "i", _:containerid);
 
     return true;
 }
@@ -145,6 +172,24 @@ stock GetContainerSize(Container:containerid) {
     }
 
     return pool_capacity(gContainerData[containerid][E_CONTAINER_POOL]);
+}
+
+stock bool:SetContainerOrdered(Container:containerid, bool:ordered) {
+    if (!IsValidContainer(containerid)) {
+        return false;
+    }
+
+    pool_set_ordered(gContainerData[containerid][E_CONTAINER_POOL], ordered);
+
+    return true;
+}
+
+stock bool:IsContainerOrdered(Container:containerid) {
+    if (!IsValidContainer(containerid)) {
+        return false;
+    }
+
+    return pool_is_ordered(gContainerData[containerid][E_CONTAINER_POOL]);
 }
 
 stock GetContainerItemCount(Container:containerid) {
@@ -241,6 +286,30 @@ stock bool:GetContainerSlotItem(Container:containerid, index, &Item:itemid) {
     return pool_get_safe(gContainerData[containerid][E_CONTAINER_POOL], index, _:itemid);
 }
 
+stock bool:GetContainerItems(Container:containerid, Item:items[MAX_CONTAINER_SLOTS] = { INVALID_ITEM_ID, ... }, &count = 0) {
+    if (!IsValidContainer(containerid)) {
+        return false;
+    }
+
+    count = 0;
+
+    new
+        Item:itemid
+    ;
+
+    for (new Iter:it = pool_iter(gContainerData[containerid][E_CONTAINER_POOL]); iter_inside(it); iter_move_next(it)) {
+        if (!iter_get_value_safe(it, _:itemid)) {
+            print("WARN: [GetContainerItems] -> `iter_get_value_safe` Returns `false`.");
+
+            continue;
+        }
+
+        items[count++] = itemid;
+    }
+
+    return true;
+}
+
 stock bool:GetItemContainerData(Item:itemid, &Container:containerid = INVALID_CONTAINER_ID, &index = -1) {
     if (!IsValidItem(itemid)) {
         return false;
@@ -250,4 +319,16 @@ stock bool:GetItemContainerData(Item:itemid, &Container:containerid = INVALID_CO
     index = gItemContainerSlotID[itemid];
 
     return true;
+}
+
+/**
+ * # Hooks
+ */
+
+hook OnItemDestroy(Item:itemid) {
+    if (gItemContainerID[itemid] != INVALID_CONTAINER_ID) {
+        RemoveItemFromContainer(gItemContainerID[itemid], gItemContainerSlotID[itemid]);
+    }
+    
+    return 1;
 }

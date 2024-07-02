@@ -120,7 +120,7 @@ stock Item:CreateItem(ItemBuild:build) {
 
     gItemData[id][E_ITEM_BUILD_ID] = build;
 
-    CallLocalFunction("OnItemCreate", "i", _:itemid);
+    CallLocalFunction("OnItemCreate", "i", _:id);
 
     return id;
 }
