@@ -1,3 +1,9 @@
+#if defined _INC_CONTAINER_
+    #endinput
+#endif
+
+#define _INC_CONTAINER_
+
 #include <PawnPlus>
 
 #include <YSI_Data\y_iterate>
@@ -51,7 +57,7 @@ forward Container:CreateContainer(const name[], size, bool:ordered = true);
 forward bool:IsValidContainer(Container:containerid);
 forward bool:DestroyContainer(Container:containerid, bool:clear = true);
 forward bool:SetContainerName(Container:containerid, const name[]);
-forward bool:GetContainerName(Container:containerid, name[], size = sizeof (name));
+forward bool:GetContainerName(Container:containerid, dest[], size = sizeof (dest));
 forward bool:SetContainerSize(Container:containerid, size);
 forward GetContainerSize(Container:containerid);
 forward GetContainerItemCount(Container:containerid);
@@ -73,6 +79,24 @@ forward OnContainerDestroy(Container:containerid);
 
 forward OnItemAddToContainer(Container:containerid, Item:itemid, index, playerid);
 forward OnItemRemoveFromContainer(Container:containerid, Item:itemid, index, playerid);
+
+/**
+ * # Iter
+ */
+
+stock bool:Iter_Func@ContainerItem(Container:containerid) {
+    if (!IsValidContainer(containerid)) {
+        return false;
+    }
+
+    for (new Iter:it = pool_iter(gContainerData[containerid][E_CONTAINER_POOL]); iter_inside(it); iter_move_next(it)) {
+        yield return iter_get_value(it);
+    }
+
+    return true;
+}
+
+#define Iterator@ContainerItem iteryield
 
 /**
  * # External
@@ -110,16 +134,10 @@ stock bool:DestroyContainer(Container:containerid, bool:clear = true) {
 
     if (clear) {
         new
-            Item:dest[MAX_CONTAINER_SLOTS],
-            count,
             Item:itemid
         ;
 
-        GetContainerItems(containerid, dest, count);
-
-        for (new i; i < count; ++i) {
-            itemid = dest[i];
-
+        foreach ((_:itemid) : ContainerItem(containerid)) {
             gItemContainerID[itemid] = INVALID_CONTAINER_ID;
             gItemContainerSlotID[itemid] = -1;
 
@@ -146,12 +164,12 @@ stock bool:SetContainerName(Container:containerid, const name[]) {
     return true;
 }
 
-stock bool:GetContainerName(Container:containerid, name[], size = sizeof (name)) {
+stock bool:GetContainerName(Container:containerid, dest[], size = sizeof (dest)) {
     if (!IsValidContainer(containerid)) {
         return false;
     }
 
-    strcopy(name, gContainerData[containerid][E_CONTAINER_NAME], size);
+    strcopy(dest, gContainerData[containerid][E_CONTAINER_NAME], size);
 
     return true;
 }
@@ -186,7 +204,7 @@ stock bool:SetContainerOrdered(Container:containerid, bool:ordered) {
 
 stock bool:IsContainerOrdered(Container:containerid) {
     if (!IsValidContainer(containerid)) {
-        return false;
+        return undefined;
     }
 
     return pool_is_ordered(gContainerData[containerid][E_CONTAINER_POOL]);
@@ -252,7 +270,7 @@ stock RemoveItemFromContainer(Container:containerid, index, &Item:itemid = INVAL
 
 stock bool:IsContainerEmpty(Container:containerid) {
     if (!IsValidContainer(containerid)) {
-        return false;
+        return undefined;
     }
 
     return (pool_size(gContainerData[containerid][E_CONTAINER_POOL]) == 0);
@@ -260,7 +278,7 @@ stock bool:IsContainerEmpty(Container:containerid) {
 
 stock bool:IsContainerFull(Container:containerid) {
     if (!IsValidContainer(containerid)) {
-        return false;
+        return undefined;
     }
 
     return (pool_size(gContainerData[containerid][E_CONTAINER_POOL]) >= pool_capacity(gContainerData[containerid][E_CONTAINER_POOL]));
@@ -284,30 +302,6 @@ stock bool:GetContainerSlotItem(Container:containerid, index, &Item:itemid) {
     }
 
     return pool_get_safe(gContainerData[containerid][E_CONTAINER_POOL], index, _:itemid);
-}
-
-stock bool:GetContainerItems(Container:containerid, Item:items[MAX_CONTAINER_SLOTS] = { INVALID_ITEM_ID, ... }, &count = 0) {
-    if (!IsValidContainer(containerid)) {
-        return false;
-    }
-
-    count = 0;
-
-    new
-        Item:itemid
-    ;
-
-    for (new Iter:it = pool_iter(gContainerData[containerid][E_CONTAINER_POOL]); iter_inside(it); iter_move_next(it)) {
-        if (!iter_get_value_safe(it, _:itemid)) {
-            print("WARN: [GetContainerItems] -> `iter_get_value_safe` Returns `false`.");
-
-            continue;
-        }
-
-        items[count++] = itemid;
-    }
-
-    return true;
 }
 
 stock bool:GetItemContainerData(Item:itemid, &Container:containerid = INVALID_CONTAINER_ID, &index = -1) {

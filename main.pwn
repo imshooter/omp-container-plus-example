@@ -1,116 +1,307 @@
 #define MAX_PLAYERS (2)
 
 #include <open.mp>
+#include <mysql>
+#include <PawnPlus>
+#include <pp-mysql>
 
 #include <YSI_Data\y_iterate>
 #include <YSI_Coding\y_hooks>
+#include <YSI_Extra\y_inline_mysql>
 
 #include ".\core\item.pwn"
+#include ".\core\item-plus.pwn"
 #include ".\core\container.pwn"
 #include ".\core\inventory.pwn"
 
+static
+    DBID:gAccountDBID[MAX_PLAYERS] = { DBID:2, ... },
+    DBID:gItemBuildDBID[MAX_ITEM_BUILDS]
+;
+
+enum {
+    ITEM_AK_47,
+    ITEM_M4,
+    ITEM_PIZZA,
+    ITEM_HAMBURGER,
+    ITEM_MEDKIT
+};
+
+static stock const
+    gItemBuildKeys[][MAX_ITEM_KEY_LENGTH + 1 char] =
+{
+    !"ak47",
+    !"m4",
+    !"pizza",
+    !"hamburger",
+    !"medkit"
+};
+
 main(){}
 
+/**
+ * # Test
+ */
+
+stock bool:GetItemBuildByIndex(index, &ItemBuild:build) {
+    if (!(0 <= index < sizeof (gItemBuildKeys))) {
+        return false;
+    }
+
+    return GetKeyItemBuild(gItemBuildKeys[index], build);
+}
+
+stock bool:IsItemBuildMatchKeyByIndex(ItemBuild:build, index) {
+    if (!(0 <= index < sizeof (gItemBuildKeys))) {
+        return false;
+    }
+
+    return IsItemBuildMatchKey(build, gItemBuildKeys[index]);
+}
+
+stock DBID:GetAccountDatabaseID(playerid) {
+    return gAccountDBID[playerid];
+}
+
+/**
+ * # Calls
+ */
+
 public OnGameModeInit() {
-    new const
-        ItemBuild:b = BuildItem("M4", 356),
-        Container:c = CreateContainer("Container", 16)
-    ;
+    // Connect
+    mysql_connect("localhost", "root", "", "i");
 
-    new
-        Item:itm, ret, idx
-    ;
+    // Retrieve
+    LoadItemBuilds();
 
-    for (new i; i != 8; ++i) {
-        itm = CreateItem(b);
-        ret = AddItemToContainer(c, itm, idx);
+    return 1;
+}
 
-        printf("(AddItemToContainer) -> Returns (%i) Add Item (%i) in slot (%i) to container (%i).", ret, _:itm, idx, _:c);
+public OnPlayerConnect(playerid) {
+    LoadInventory(playerid);
+    
+    return 1;
+}
+
+public OnPlayerDisconnect(playerid, reason) {
+    SaveInventory(playerid);
+    
+    return 1;
+}
+
+/**
+ * # Database
+ */
+
+void:LoadItemBuilds() {
+    inline const OnRetrieve() {
+        new const
+            rows = cache_num_rows()
+        ;
+
+        if (!rows) {
+            @return 1;
+        }
+
+        enum _:E_ITEM_BUILD_DATA {
+            DBID:E_ITEM_BUILD_DBID,
+            E_ITEM_BUILD_NAME[MAX_ITEM_BUILD_NAME + 1],
+            E_ITEM_BUILD_KEY[MAX_ITEM_BUILD_NAME + 1],
+            E_ITEM_BUILD_MODEL
+        };
+
+        new
+            data[E_ITEM_BUILD_DATA]
+        ;
+
+        for (new i; i < rows; ++i) {
+            cache_get_value_int(i, "id", _:data[E_ITEM_BUILD_DBID]);
+            cache_get_value(i, "name", data[E_ITEM_BUILD_NAME]);
+            cache_get_value(i, "name-key", data[E_ITEM_BUILD_KEY]);
+            cache_get_value_int(i, "model", data[E_ITEM_BUILD_MODEL]);
+
+            new const
+                ItemBuild:b = BuildItem(data[E_ITEM_BUILD_NAME], data[E_ITEM_BUILD_MODEL])
+            ;
+
+            gItemBuildDBID[b] = data[E_ITEM_BUILD_DBID];
+
+            SetKeyItemBuild(data[E_ITEM_BUILD_KEY], b);
+        }
     }
 
-    print("-");
-    print("-");
+    MySQL_TQueryInline(MYSQL_DEFAULT_HANDLE, using inline OnRetrieve, "SELECT * FROM `item-builds`;");
+}
 
-    new
-        Item:arr[MAX_CONTAINER_SLOTS],
-        count
-    ;
+void:LoadInventory(playerid) {
+    inline const OnRetrieve() {
+        new const
+            rows = cache_num_rows()
+        ;
 
-    GetContainerItems(c, arr, count);
+        if (!rows) {
+            @return 1;
+        }
 
-    for (new i; i != count; ++i) {
-        itm = arr[i];
+        new
+            row,
+            lastRow,
+            ItemBuild:build,
+            Item:itemid,
+            itemKey[MAX_ITEM_KEY_LENGTH + 1],
+            bool:hasData,
+            attributeKey[MAX_ITEM_KEY_LENGTH + 1],
+            attributeValue,
+            itemUUID[UUID_LEN]
+        ;
 
-        GetItemContainerData(itm, .index = idx);
+        for (new i; i < rows; ++i) {
+            cache_get_value_int(i, "row", row);
+            
+            if (lastRow != row) {
+                cache_get_value(i, "uuid", itemUUID);
+                cache_get_value(i, "name-key", itemKey);
 
-        printf("(GetContainerItems) -> Item (%i) ~ Index (%i).", _:itm, idx);
-    }
+                GetKeyItemBuild(itemKey, build);
 
-    print("-");
-    print("-");
+                itemid = CreateItem(
+                    build,
+                    itemUUID
+                );
 
-    for (new i = 4; --i >= 0;) {
-        RemoveItemFromContainer(c, i, itm);
+                if (itemid == INVALID_ITEM_ID) {
+                    SendClientMessage(playerid, -1, "WARN: The server has reached the limit of creating items and your inventory is incomplete.");
+                    
+                    break;
+                }
 
-        printf("(RemoveItemFromContainer) -> Item (%i) removed from container (%i).", _:itm, _:c);
-    }
-
-    GetContainerItems(c, arr, count);
-
-    for (new i; i != count; ++i) {
-        itm = arr[i];
-
-        GetItemContainerData(itm, .index = idx);
-
-        printf("(GetContainerItems) -> Item (%i) ~ Index (%i).", _:itm, idx);
-    }
-
-    print("-");
-    print("-");
-
-    for (new i; i != 2; ++i) {
-        itm = CreateItem(b);
-        ret = AddItemToContainer(c, itm, idx);
-
-        printf("(AddItemToContainer) -> Returns (%i) Add Item (%i) in slot (%i) to container (%i).", ret, _:itm, idx, _:c);
-    }
-
-    GetContainerItems(c, arr, count);
-
-    for (new i; i != count; ++i) {
-        itm = arr[i];
-
-        GetItemContainerData(itm, .index = idx);
-
-        printf("(GetContainerItems) -> Item (%i) ~ Index (%i).", _:itm, idx);
-    }
-
-    print("-");
-    print("-");
-
-    for (new i; i != 2; ++i) {
-        GetContainerSlotItem(c, i, itm);
+                cache_is_value_null(i, "owner-id", hasData);
+                hasData = !hasData;
         
-        if (!DestroyItem(itm)) {
-            printf("(DestroyItem) -> Returns `false` to remove item (%i) index (%i).", _:itm, i);
+                if (hasData) {
+                    if (AddItemToInventory(playerid, itemid)) {
+                        break;
+                    }
+                }
 
+                lastRow = row;
+            }
+
+            cache_is_value_null(i, "key", hasData);
+            hasData = !hasData;
+
+            if (hasData) {
+                cache_get_value(i, "key", attributeKey);
+                cache_get_value_int(i, "value", attributeValue);
+
+                SetItemExtraData(
+                    itemid,
+                    attributeKey,
+                    attributeValue
+                );
+            }
+        }
+    }
+
+    MySQL_TQueryInline(MYSQL_DEFAULT_HANDLE, using inline OnRetrieve, "\
+        SELECT \
+            DENSE_RANK() OVER (ORDER BY `it`.`uuid`) AS `row`, \
+            `it`.`owner-id`, \
+            `it`.`uuid`, \
+            `ib`.`name-key`, \
+            `ia`.`key`, \
+            `ia`.`value` \
+        FROM \
+            `items` AS `it` \
+        JOIN \
+            `item-builds` AS `ib` ON `it`.`item-build-id` = `ib`.`id` \
+        LEFT JOIN \
+            `item-attributes` AS `ia` ON `it`.`uuid` = `ia`.`item-uuid` \
+        WHERE \
+            `it`.`owner-id` = %i;", _:GetAccountDatabaseID(playerid)
+    );
+}
+
+void:SaveInventory(playerid) {
+    if (IsInventoryEmpty(playerid)) {
+        return;
+    }
+
+    new
+        ItemBuild:build,
+        Item:itemid,
+        uuid[UUID_LEN],
+        Map:map,
+        data[2],
+        List:list = list_new()
+    ;
+
+    new const
+        String:str = @("INSERT INTO `items` (`owner-id`, `item-build-id`, `uuid`) VALUES ")
+    ;
+
+    foreach ((_:itemid) : InventoryItem(playerid)) {
+        GetItemBuild(itemid, build);
+        GetItemUUID(itemid, uuid);
+
+        str_append_format(str, "(%i, %i, '%e'), ", _:GetAccountDatabaseID(playerid), _:gItemBuildDBID[build], uuid);
+
+        if (!GetItemExtraDataMap(itemid, map)) {
             continue;
         }
 
-        printf("(DestroyItem) -> Item (%i) index (%i) from container (%i) destroyed.", _:itm, i, _:c);
+        data[0] = _:str_acquire(@(uuid));
+        data[1] = _:map_clone(map);
+
+        list_add_arr(list, data);
     }
 
-    GetContainerItems(c, arr, count);
+    mysql_tquery_s(MYSQL_DEFAULT_HANDLE,
+        str_addr(
+            str_replace(str, ".{2}$", " ON DUPLICATE KEY UPDATE `uuid` = `uuid`;")
+        ),
+        "OnItemExtraDataSaveAsync", "ii", playerid, _:list
+    );
+}
 
-    for (new i; i != count; ++i) {
-        itm = arr[i];
+forward void:OnItemExtraDataSaveAsync(playerid, List:list);
+public void:OnItemExtraDataSaveAsync(playerid, List:list) {
+    if (list_size(list) != 0) {
+        new
+            data[2],
+            attributeKey[MAX_ITEM_KEY_LENGTH + 1],
+            attributeValue
+        ;
 
-        GetItemContainerData(itm, .index = idx);
+        new const
+            String:str = @("INSERT INTO `item-attributes` (`key`, `value`, `item-uuid`) VALUES ")
+        ;
 
-        printf("(GetContainerItems) -> Item (%i) ~ Index (%i).", _:itm, idx);
+        for (new Iter:a = list_iter(list); iter_inside(a); iter_move_next(a)) {
+            iter_get_arr(a, data);
+
+            for (new Iter:b = map_iter(Map:data[1]); iter_inside(b); iter_move_next(b)) {
+                if (!iter_get_key_str_safe(b, attributeKey)) {
+                    continue;
+                }
+
+                if (!iter_get_value_safe(b, attributeValue)) {
+                    continue;
+                }
+
+                str_append_format(str, "('%e', %i, '%E'), ", attributeKey, attributeValue, String:data[0]);
+            }
+
+            str_delete(String:data[0]);
+            map_delete(Map:data[1]);
+        }
+
+        mysql_tquery_s(MYSQL_DEFAULT_HANDLE,
+            str_addr(
+                str_replace(str, ".{2}$", " ON DUPLICATE KEY UPDATE `value` = VALUES(`value`);")
+            )
+        );
     }
 
-    DestroyContainer(c);
-    
-    return 1;
+    list_delete(list);
 }

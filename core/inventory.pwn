@@ -1,3 +1,9 @@
+#if defined _INC_INVENTORY_
+    #endinput
+#endif
+
+#define _INC_INVENTORY_
+
 #include <YSI_Data\y_iterate>
 #include <YSI_Coding\y_hooks>
 #include <YSI_Coding\y_timers>
@@ -21,14 +27,40 @@ static
 
 forward AddItemToInventory(playerid, Item:itemid, &index = -1, bool:call = true);
 forward RemoveItemFromInventory(playerid, index, &Item:itemid = INVALID_ITEM_ID, bool:call = true);
+forward bool:IsInventoryEmpty(playerid);
+forward bool:IsInventoryFull(playerid);
+forward bool:IsInventorySlotUsed(playerid, index);
+forward bool:GetInventorySlotItem(playerid, index, &Item:itemid);
 forward bool:GetInventoryContainer(playerid, &Container:containerid);
 
 /**
  * # Events
  */
 
-forward OnItemAddToInventory(playerid, Item:itemid);
+forward OnItemAddToInventory(playerid, Item:itemid, index);
 forward OnItemRemoveFromInventory(playerid, Item:itemid, index);
+
+/**
+ * # Iter
+ */
+
+stock bool:Iter_Func@InventoryItem(playerid) {
+    if (!IsPlayerConnected(playerid)) {
+        return false;
+    }
+
+    new
+        Item:itemid
+    ;
+
+    foreach ((_:itemid) : ContainerItem(gOwnerContainerID[playerid])) {
+        yield return _:itemid;
+    }
+
+    return true;
+}
+
+#define Iterator@InventoryItem iteryield
 
 /**
  * # External
@@ -72,6 +104,38 @@ stock RemoveItemFromInventory(playerid, index, &Item:itemid = INVALID_ITEM_ID, b
     }
 
     return 0;
+}
+
+stock bool:IsInventoryEmpty(playerid) {
+    if (!IsPlayerConnected(playerid)) {
+        return undefined;
+    }
+
+    return IsContainerEmpty(gOwnerContainerID[playerid]);
+}
+
+stock bool:IsInventoryFull(playerid) {
+    if (!IsPlayerConnected(playerid)) {
+        return undefined;
+    }
+
+    return IsContainerFull(gOwnerContainerID[playerid]);
+}
+
+stock bool:IsInventorySlotUsed(playerid, index) {
+    if (!IsPlayerConnected(playerid)) {
+        return false;
+    }
+
+    return IsContainerSlotUsed(gOwnerContainerID[playerid], index);
+}
+
+stock bool:GetInventorySlotItem(playerid, index, &Item:itemid) {
+    if (!IsPlayerConnected(playerid)) {
+        return false;
+    }
+
+    return GetContainerSlotItem(gOwnerContainerID[playerid], index, itemid);
 }
 
 stock bool:GetInventoryContainer(playerid, &Container:containerid) {
