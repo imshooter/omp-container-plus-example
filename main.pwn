@@ -14,8 +14,12 @@
 #include ".\core\container.pwn"
 #include ".\core\inventory.pwn"
 
+/**
+ * # Header
+ */
+
 static
-    DBID:gAccountDBID[MAX_PLAYERS] = { DBID:2, ... },
+    DBID:gAccountDBID[MAX_PLAYERS] = { DBID:1, ... },
     DBID:gItemBuildDBID[MAX_ITEM_BUILDS]
 ;
 
@@ -40,7 +44,7 @@ static stock const
 main(){}
 
 /**
- * # Test
+ * # Example
  */
 
 stock bool:GetItemBuildByIndex(index, &ItemBuild:build) {
@@ -148,25 +152,27 @@ void:LoadInventory(playerid) {
             lastRow,
             ItemBuild:build,
             Item:itemid,
-            itemKey[MAX_ITEM_KEY_LENGTH + 1],
+            extraName[MAX_ITEM_EXTRA_NAME + 1],
+            uuid[UUID_LEN],
+            buildNameKey[MAX_ITEM_KEY_LENGTH + 1],
             bool:hasData,
             attributeKey[MAX_ITEM_KEY_LENGTH + 1],
-            attributeValue,
-            itemUUID[UUID_LEN]
+            attributeValue
         ;
 
         for (new i; i < rows; ++i) {
             cache_get_value_int(i, "row", row);
-            
-            if (lastRow != row) {
-                cache_get_value(i, "uuid", itemUUID);
-                cache_get_value(i, "name-key", itemKey);
 
-                GetKeyItemBuild(itemKey, build);
+            if (lastRow != row) {
+                cache_get_value(i, "extra-name", extraName);
+                cache_get_value(i, "uuid", uuid);
+                cache_get_value(i, "name-key", buildNameKey);
+
+                GetKeyItemBuild(buildNameKey, build);
 
                 itemid = CreateItem(
                     build,
-                    itemUUID
+                    .uuid = uuid
                 );
 
                 if (itemid == INVALID_ITEM_ID) {
@@ -175,13 +181,10 @@ void:LoadInventory(playerid) {
                     break;
                 }
 
-                cache_is_value_null(i, "owner-id", hasData);
-                hasData = !hasData;
-        
-                if (hasData) {
-                    if (AddItemToInventory(playerid, itemid)) {
-                        break;
-                    }
+                SetItemExtraName(itemid, extraName);
+
+                if (AddItemToInventory(playerid, itemid)) {
+                    break;
                 }
 
                 lastRow = row;
@@ -207,6 +210,7 @@ void:LoadInventory(playerid) {
         SELECT \
             DENSE_RANK() OVER (ORDER BY `it`.`uuid`) AS `row`, \
             `it`.`owner-id`, \
+            `it`.`extra-name`, \
             `it`.`uuid`, \
             `ib`.`name-key`, \
             `ia`.`key`, \
@@ -231,20 +235,22 @@ void:SaveInventory(playerid) {
         ItemBuild:build,
         Item:itemid,
         uuid[UUID_LEN],
+        extraName[MAX_ITEM_EXTRA_NAME + 1],
         Map:map,
         data[2],
         List:list = list_new()
     ;
 
     new const
-        String:str = @("INSERT INTO `items` (`owner-id`, `item-build-id`, `uuid`) VALUES ")
+        String:str = @("INSERT INTO `items` (`owner-id`, `item-build-id`, `extra-name`, `uuid`) VALUES ")
     ;
 
     foreach ((_:itemid) : InventoryItem(playerid)) {
         GetItemBuild(itemid, build);
         GetItemUUID(itemid, uuid);
+        GetItemExtraName(itemid, extraName);
 
-        str_append_format(str, "(%i, %i, '%e'), ", _:GetAccountDatabaseID(playerid), _:gItemBuildDBID[build], uuid);
+        str_append_format(str, "(%i, %i, '%e', '%e'), ", _:GetAccountDatabaseID(playerid), _:gItemBuildDBID[build], extraName, uuid);
 
         if (!GetItemExtraDataMap(itemid, map)) {
             continue;

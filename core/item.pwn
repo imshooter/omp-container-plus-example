@@ -25,6 +25,14 @@
     #define MAX_ITEM_BUILD_NAME (32)
 #endif
 
+#if !defined MAX_ITEM_EXTRA_NAME
+    #define MAX_ITEM_EXTRA_NAME (32)
+#endif
+
+#if !defined MAX_ITEM_NAME
+    #define MAX_ITEM_NAME (MAX_ITEM_BUILD_NAME + MAX_ITEM_EXTRA_NAME)
+#endif
+
 #define INVALID_ITEM_BUILD_ID (ItemBuild:-1)
 #define INVALID_ITEM_ID (Item:-1)
 
@@ -35,7 +43,7 @@ static enum E_ITEM_BUILD_DATA {
 
 static enum E_ITEM_DATA {
     ItemBuild:E_ITEM_BUILD_ID,
-
+    
     // TODO:
 
     Float:E_ITEM_X,
@@ -54,7 +62,8 @@ static enum E_ITEM_DATA {
 
     // UUID:
 
-    E_ITEM_UUID[UUID_LEN]
+    E_ITEM_UUID[UUID_LEN],
+    E_ITEM_EXTRA_NAME[MAX_ITEM_NAME + 1]
 };
 
 static
@@ -84,10 +93,12 @@ forward GetItemBuildModel(ItemBuild:build);
 forward Item:CreateItem(ItemBuild:build, const uuid[] = "");
 forward bool:IsValidItem(Item:itemid);
 forward bool:GetItemBuild(Item:itemid, &ItemBuild:build);
+forward bool:SetItemExtraName(Item:itemid, const name[]);
+forward bool:GetItemExtraName(Item:itemid, dest[], size = sizeof (dest));
 forward bool:GetItemUUID(Item:itemid, dest[], size = sizeof (dest));
 
 /**
- * # External
+ * # Events
  */
 
 forward OnItemBuild(ItemBuild:build);
@@ -187,12 +198,52 @@ stock bool:GetItemBuild(Item:itemid, &ItemBuild:build) {
     return true;
 }
 
+stock bool:SetItemExtraName(Item:itemid, const name[]) {
+    if (!IsValidItem(itemid)) {
+        return false;
+    }
+
+    strcopy(gItemData[itemid][E_ITEM_EXTRA_NAME], name);
+
+    return true;
+}
+
+stock bool:GetItemExtraName(Item:itemid, dest[], size = sizeof (dest)) {
+    if (!IsValidItem(itemid)) {
+        return false;
+    }
+
+    strcopy(dest, gItemData[itemid][E_ITEM_EXTRA_NAME], size);
+
+    return true;
+}
+
 stock bool:GetItemUUID(Item:itemid, dest[], size = sizeof (dest)) {
     if (!IsValidItem(itemid)) {
         return false;
     }
 
     strcopy(dest, gItemData[itemid][E_ITEM_UUID], size);
+
+    return true;
+}
+
+stock bool:GetItemName(Item:itemid, dest[], size = sizeof (dest)) {
+    if (!IsValidItem(itemid)) {
+        return false;
+    }
+
+    new const
+        ItemBuild:b = gItemData[itemid][E_ITEM_BUILD_ID]
+    ;
+
+    strcopy(dest, gItemBuildData[b][E_ITEM_BUILD_NAME], size);
+
+    if (!isnull(gItemData[itemid][E_ITEM_EXTRA_NAME])) {
+        strcat(dest, " (", size);
+        strcat(dest, gItemData[itemid][E_ITEM_EXTRA_NAME], size);
+        strcat(dest, ")", size);
+    }
 
     return true;
 }
